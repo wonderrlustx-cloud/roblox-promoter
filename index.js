@@ -5,12 +5,12 @@ const app = express();
 app.use(express.json());
 
 // ================= CONFIG =================
-const GROUP_ID = 251509289; // change THIS only on server
+const GROUP_ID = 251509289;
 const COOKIE = process.env.ROBLOX_COOKIE;
 
 // ================= SAFETY =================
 if (!COOKIE) {
-  console.log("❌ Missing ROBLOX_COOKIE in Render environment");
+  console.log("❌ Missing ROBLOX_COOKIE");
 }
 
 // ================= CSRF =================
@@ -37,7 +37,7 @@ async function getUserRole(userId) {
   return group ? group.role : null;
 }
 
-// ================= GET GROUP ROLES =================
+// ================= GET ROLES =================
 async function getGroupRoles() {
   const res = await fetch(
     `https://groups.roblox.com/v1/groups/${GROUP_ID}/roles`
@@ -72,14 +72,14 @@ async function promoteUser(userId) {
     ]);
 
     if (!currentRole) {
-      console.log("User not in group");
+      console.log("❌ User not in group");
       return false;
     }
 
     const nextRole = getNextRole(currentRole, roles);
 
     if (!nextRole) {
-      console.log("Already max rank");
+      console.log("❌ Already max rank");
       return false;
     }
 
@@ -101,10 +101,13 @@ async function promoteUser(userId) {
     const text = await res.text();
 
     if (!res.ok) {
-      console.log("ROBLOX ERROR:", text);
+      console.log("❌ ROBLOX FAILED:");
+      console.log("Status:", res.status);
+      console.log("Response:", text);
       return false;
     }
 
+    console.log("✅ PROMOTED USER:", userId);
     return true;
   } catch (err) {
     console.log("ERROR:", err);
@@ -116,18 +119,18 @@ async function promoteUser(userId) {
 app.post("/promote", async (req, res) => {
   const { userId } = req.body;
 
+  console.log("📩 Request received:", userId);
+
   if (!userId) {
-    return res.json({ success: false, error: "Missing userId" });
+    return res.json({ success: false });
   }
 
   const result = await promoteUser(userId);
 
-  res.json({
-    success: result
-  });
+  res.json({ success: result });
 });
 
-// ================= START SERVER =================
+// ================= START =================
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
