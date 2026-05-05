@@ -13,7 +13,7 @@ if (!COOKIE) {
   console.log("❌ Missing ROBLOX_COOKIE");
 }
 
-// ================= CSRF =================
+// ================= CSRF (FIXED RELIABILITY) =================
 async function getCSRF() {
   const res = await fetch("https://auth.roblox.com/v2/logout", {
     method: "POST",
@@ -25,51 +25,61 @@ async function getCSRF() {
   return res.headers.get("x-csrf-token");
 }
 
-// ================= GET USER ROLE =================
+// ================= GET USER ROLE (FIXED SAFETY) =================
 async function getUserRole(userId) {
   const res = await fetch(
-    `https://groups.roblox.com/v1/users/${userId}/groups/roles`
+    `https://groups.roblox.com/v1/users/${userId}/groups/roles`,
+    {
+      headers: {
+        Cookie: `.ROBLOSECURITY=${COOKIE}`
+      }
+    }
   );
 
   const data = await res.json();
 
-  const group = data.data.find(g => g.group.id === GROUP_ID);
+  if (!data?.data) return null;
+
+  const group = data.data.find(g => g?.group?.id === GROUP_ID);
   return group ? group.role : null;
 }
 
-// ================= GET ROLES =================
+// ================= GET ROLES (FIXED HEADERS) =================
 async function getGroupRoles() {
   const res = await fetch(
-    `https://groups.roblox.com/v1/groups/${GROUP_ID}/roles`
+    `https://groups.roblox.com/v1/groups/${GROUP_ID}/roles`,
+    {
+      headers: {
+        Cookie: `.ROBLOSECURITY=${COOKIE}`
+      }
+    }
   );
 
   const data = await res.json();
-  return data.roles;
+  return data.roles || [];
 }
 
 // ================= NEXT ROLE =================
 function getNextRole(currentRole, roles) {
-  const sorted = roles.sort((a, b) => a.rank - b.rank);
+  const sorted = [...roles].sort((a, b) => a.rank - b.rank);
 
-  for (let i = 0; i < sorted.length; i++) {
-    if (sorted[i].id === currentRole.id) {
-      return sorted[i + 1] || null;
-    }
-  }
+  const index = sorted.findIndex(r => r.id === currentRole.id);
+  if (index === -1) return null;
 
-  return null;
+  return sorted[index + 1] || null;
 }
 
-// ================= PROMOTE =================
+// ================= PROMOTE (HARDENED) =================
 async function promoteUser(userId) {
   try {
     const csrf = await getCSRF();
-    if (!csrf) return false;
+    if (!csrf) {
+      console.log("❌ Failed to get CSRF");
+      return false;
+    }
 
-    const [roles, currentRole] = await Promise.all([
-      getGroupRoles(),
-      getUserRole(userId)
-    ]);
+    const roles = await getGroupRoles();
+    const currentRole = await getUserRole(userId);
 
     if (!currentRole) {
       console.log("❌ User not in group");
@@ -86,7 +96,7 @@ async function promoteUser(userId) {
     const res = await fetch(
       `https://groups.roblox.com/v1/groups/${GROUP_ID}/users/${userId}`,
       {
-        method: "POST",
+        method: "PATCH",
         headers: {
           "Content-Type": "application/json",
           "x-csrf-token": csrf,
@@ -102,15 +112,15 @@ async function promoteUser(userId) {
 
     if (!res.ok) {
       console.log("❌ ROBLOX FAILED:");
-      console.log("Status:", res.status);
-      console.log("Response:", text);
+      console.log(text);
       return false;
     }
 
-    console.log("✅ PROMOTED USER:", userId);
+    console.log("✅ PROMOTED:", userId);
     return true;
+
   } catch (err) {
-    console.log("ERROR:", err);
+    console.log("❌ SERVER ERROR:", err);
     return false;
   }
 }
@@ -118,8 +128,6 @@ async function promoteUser(userId) {
 // ================= ROUTE =================
 app.post("/promote", async (req, res) => {
   const { userId } = req.body;
-
-  console.log("📩 Request received:", userId);
 
   if (!userId) {
     return res.json({ success: false });
