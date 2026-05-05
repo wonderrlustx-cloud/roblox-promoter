@@ -5,7 +5,7 @@ const app = express();
 app.use(express.json());
 
 // ================= CONFIG =================
-const GROUP_ID = 36059759;
+const GROUP_ID = 251509289;
 const COOKIE = process.env.ROBLOX_COOKIE;
 
 // ================= CHECK COOKIE =================
